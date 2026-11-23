@@ -48,7 +48,10 @@ ADB, который больше не спрашивает разрешение 
 4. **Лаунчер Сбера удалён**, вместе с ним 19 приложений Сбера (`pm uninstall --user 0`). Оставлены
    нужные для пульта, ассистента, «Телеканалов» и настроек.
 5. **«Эфир ТВ+» заменён на «Цифровое ТВ»** (Lime HD, `limehd.ru.ctv` 5.1.1); старый APK сохранён.
-6. **Сторож «Сбер-Стоп NA»** (`io.sberstop`) — после загрузки и раз в ~2 минуты удаляет вернувшееся,
+6. **Автообновления Сбера выключены**: `ota_disable_automatic_update=1`, `auto_update_apps=0`
+   и отключён сам OTA-апдейтер (`ru.sberdevices.updater`, `enabled=disabled-user`). Проверено
+   перезагрузкой — не включается обратно.
+7. **Сторож «Сбер-Стоп NA»** (`io.sberstop`) — после загрузки и раз в ~2 минуты удаляет вернувшееся,
    возвращает Home на NA, выключает автообновления и рекламный оверлей Сбера. Его ADB-ключ
    сгенерирован заранее и внесён в `adb_keys` — подключается без диалога. **Работает в фоне**
    (JobScheduler, `PERSISTED`): экран не открывает и поверх лаунчера не появляется — UI только
@@ -64,6 +67,7 @@ ADB, который больше не спрашивает разрешение 
 | [scripts/debloat.sh](scripts/debloat.sh) + [debloat.txt](scripts/debloat.txt) | удалить приложения Сбера (список с комментариями) |
 | [scripts/install-launcher.sh](scripts/install-launcher.sh) | установить NA Clean Toour TV, сделать Home, заставку, конфиг |
 | [scripts/install-watchdog.sh](scripts/install-watchdog.sh) | установить сторожа и его ADB-ключ (без запроса) |
+| [scripts/block-ota.sh](scripts/block-ota.sh) | выключить автообновления прошивки/приложений и OTA-апдейтер |
 | [scripts/verify.sh](scripts/verify.sh) | проверить итоговое состояние ТВ |
 | [apk/](apk) | готовые `NA-Clean-Toour-TV-3.5.apk` и `SberStop-NA-2.0.apk` |
 | [docs/atsudo-root.md](docs/atsudo-root.md) | как устроен root через `cvte.at_sudo` (разбор бинаря, протокол, сборка) |
@@ -99,6 +103,7 @@ adb reboot
 adb connect "$TV_SERIAL"                  # проверка: подключение БЕЗ запроса
 
 bash scripts/install-launcher.sh          # NA Clean Toour TV → Home
+bash scripts/block-ota.sh                 # (по желанию) жёстко выключить автообновления Сбера
 bash scripts/debloat.sh                   # убрать приложения Сбера
 bash scripts/install-watchdog.sh          # сторож (после перезагрузки — сам)
 adb reboot

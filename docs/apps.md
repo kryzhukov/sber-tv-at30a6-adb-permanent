@@ -42,6 +42,19 @@ set-home-activity --user 0 com.gathin.tvhome/.MainActivity` → проверяе
 Заставка: `settings put secure screensaver_components com.gathin.tvhome/.ClockDream`.
 Автообновления прошивки/приложений выключаются: `ota_disable_automatic_update=1`, `auto_update_apps=0`.
 
+### Автообновления прошивки и приложений
+
+Скрипт [`scripts/block-ota.sh`](../scripts/block-ota.sh):
+
+* `settings put global ota_disable_automatic_update 1` — без автообновления прошивки;
+* `settings put global auto_update_apps 0` — без автообновления приложений;
+* `pm disable-user --user 0 ru.sberdevices.updater` — сам OTA-апдейтер Сбера
+  (`/system/priv-app/SberDevicesUpdater`) отключён (`enabled=disabled-user`).
+
+Проверено перезагрузкой: настройки и отключённый апдейтер сохраняются, ТВ загружается нормально,
+пульт/ассистент/«Телеканалы» работают. `ru.sberdevices.rcfupdater` (прошивка **пульта**) и
+`ru.sberdevices.services.core` не трогаются. Вернуть обновления — команды в шапке скрипта.
+
 ### Сборка из исходников (если нужен свой APK)
 
 ```bash

@@ -49,6 +49,15 @@ adband shell pm uninstall com.gathin.tvhome    # убрать NA (после т�
 adb -s 192.168.1.50:5555 shell rm -rf /sdcard/Android/data/com.gathin.tvhome
 ```
 
+## Включить автообновления обратно
+
+```bash
+A="adb -s 192.168.3.110:5555 shell"
+$A 'pm enable --user 0 ru.sberdevices.updater'
+$A 'settings put global ota_disable_automatic_update 0'
+$A 'settings put global auto_update_apps 1'
+```
+
 ## Вернуть запросы ADB (убрать «постоянный» доступ)
 
 ```bash
