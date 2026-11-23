@@ -1,0 +1,11 @@
+# локальные ключи сторожа (генерируются scripts/install-watchdog.sh)
+scripts/wd-key/
+*.pem
+
+# служебные артефакты сборки root-инструмента
+scripts/atsudo/*.class
+scripts/atsudo/*.class.dex
+
+# бэкапы, снятые с конкретного ТВ
+backup/
+*.apk.bak

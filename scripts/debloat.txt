@@ -1,0 +1,53 @@
+# Список приложений Сбера для удаления на SaluteTV AT30A6 (проверен на этом ТВ).
+# Формат: один пакет в строке; всё после # — комментарий.
+#
+# Использование: scripts/debloat.sh [--dry-run]
+#
+# Удаление идёт как `pm uninstall --user 0 <pkg>`: приложение исчезает для пользователя,
+# но его APK остаётся в прошивке — вернуть можно `cmd package install-existing --user 0 <pkg>`.
+#
+# Сторож «Сбер-Стоп NA» (scripts/install-watchdog.sh) знает этот же список и удаляет
+# вернувшееся после перезагрузки.
+
+# --- Лаунчер, заставка, каталог и установщик Сбера ---
+ru.sberdevices.starlauncher      # лаунчер Сбера (главный экран до установки NA)
+ru.sberdevices.starscreensaver   # заставка Сбера (~220 МБ кеша картинок)
+ru.sberdevices.starmarket        # «Каталог Сбера» (магазин приложений)
+ru.sberdevices.app.setup         # TvSetupApp, автоустановщик приложений Сбера
+
+# --- Фоновые службы и «промо» ---
+ru.sberdevices.openbeta          # бета-канал обновлений
+ru.sberdevices.starcleaner       # «Очистка памяти»
+ru.sberdevices.smarthome.promo   # промо «Умного дома»
+ru.sberdevices.bugreporter       # баг-репортер
+ru.sberdevices.survey            # опросы
+
+# --- Контент и профиль ---
+ru.sberdevices.starbrowser       # браузер Сбера
+ru.sberdevices.videos            # «Видео»
+ru.sberdevices.music             # Zvuk / «Музыка»
+ru.sberdevices.sberplay          # SberPlay (игры)
+ru.sberdevices.starprofile       # профили пользователя
+ru.sberdevices.subscriptions     # SberPrime / подписки
+ru.sberdevices.parentcontrol     # родительский контроль
+ru.sberdevices.starkidsroom.prod # «Детская комната»
+com.salute.star                  # «Умный дом» (Salute)
+com.sberbank.settings            # настройки СберБанка
+
+# --- Сторонний лаунчер, который тоже не нужен ---
+com.spocky.projengmenu           # Projectivy Launcher
+
+# =====================================================================
+# НЕ УДАЛЯТЬ (без этого отваливаются пульт, ассистент, «Телеканалы», настройки):
+#   ru.sberdevices.services, ru.sberdevices.services.core   — платформа (OTA, ассистент)
+#   ru.sberdevices.assistant                                — голосовой ассистент
+#   ru.sberdevices.tvinputs                                 — HDMI/AV, меню «Источники»
+#   ru.sberdevices.starlivetv                               — «Телеканалы» (антенна)
+#   ru.sberdevices.startube                                 — СберTube
+#   ru.sberdevices.rcfupdater                               — прошивка пульта
+#   ru.sberdevices.gamepad.service                          — пульт Homuz со смартфона
+#   ru.sberdevices.app.starkeyboard                         — единственная клавиатура
+#   ru.sberdevices.webview                                  — WebView-провайдер
+#   ru.sberdevices.settings, com.sberbank.settings          — настройки ТВ
+#   любые com.cvte.*, com.droidlogic.*                      — TV API, HDMI, тюнер
+# =====================================================================

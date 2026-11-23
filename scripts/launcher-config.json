@@ -1,0 +1,32 @@
+{
+  "hidden_apps": [
+    "com.cvte.fac.menu",
+    "com.stb.factorymenu",
+    "com.cvte.factory.at",
+    "com.cvte.license.at",
+    "com.cvte.tv.tools",
+    "ru.sberdevices.TvFactoryHelper",
+    "ru.sberdevices.webview",
+    "ru.sberdevices.starcleaner",
+    "ru.sberdevices.starprofile",
+    "ru.sberdevices.parentcontrol",
+    "ru.sberdevices.starkidsroom.prod",
+    "com.sberbank.settings",
+    "com.android.tv.settings",
+    "com.android.tv.frameworkpackagestubs",
+    "com.spocky.projengmenu"
+  ],
+  "dock_apps": [
+    "limehd.ru.ctv",
+    "com.google.android.youtube.tv",
+    "ru.more.play",
+    "ru.kinopoisk.tv"
+  ],
+  "live_tv_package": "",
+  "app_library": true,
+  "app_labels": [
+    "ru.sberdevices.settings=Центр управления",
+    "ru.sberdevices.starlivetv=Телеканалы",
+    "ru.sberdevices.startube=СберTube"
+  ]
+}
