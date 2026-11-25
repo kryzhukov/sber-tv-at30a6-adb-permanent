@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Конфигурация службы доступности «Сбер-Стоп NA» 2.1-NA (CtvCloseWatcher).
+
+  Службе НЕ нужен доступ к содержимому окон: только события смены активного окна, по которым
+  определяется, что «Цифровое ТВ» (limehd.ru.ctv) ушло с переднего плана. Поэтому
+  canRetrieveWindowContent="false" и не запрашиваются флаги вроде flagRetrieveInteractiveWindows.
+
+  packageNames НЕ задаём намеренно: нужны события и от ЧУЖИХ пакетов — именно чужое окно после ЦТВ
+  (лаунчер, настройки, systemui) запускает проверку через ADB перед очисткой. Если ограничить
+  packageNames="limehd.ru.ctv", служба не увидит уход ЦТВ и очистка не сработает.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canRetrieveWindowContent="false"
+    android:notificationTimeout="100"
+    android:description="@string/ctv_accessibility_description" />

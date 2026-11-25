@@ -49,6 +49,22 @@ adband shell pm uninstall com.gathin.tvhome    # убрать NA (после т�
 adb -s 192.168.1.50:5555 shell rm -rf /sdcard/Android/data/com.gathin.tvhome
 ```
 
+## Отключить очистку «Цифрового ТВ» после закрытия
+
+Проще всего снять галочку «Чистить «Цифровое ТВ» после закрытия» в приложении «Сбер-Стоп NA».
+Можно и через ADB — отключить службу доступности:
+
+```bash
+A="adb -s 192.168.3.110:5555 shell"
+$A 'settings get secure enabled_accessibility_services'   # посмотреть, что включено
+$A 'settings put secure enabled_accessibility_services ""' # если, кроме сторожа, служб нет
+$A 'settings put secure accessibility_enabled 0'
+```
+
+Либо только убрать сторожа из списка, сохранив остальные службы (например,
+`com.gathin.tvhome/.HomeKeyService`): взять текущую строку из `settings get`, удалить из неё
+`io.sberstop/io.sberstop.CtvCloseWatcher` и записать обратно через `settings put` с разделителем `:`.
+
 ## Включить автообновления обратно
 
 ```bash

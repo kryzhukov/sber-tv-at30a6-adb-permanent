@@ -9,3 +9,6 @@ scripts/atsudo/*.class.dex
 # бэкапы, снятые с конкретного ТВ
 backup/
 *.apk.bak
+
+# артефакты сборки сторожа
+watchdog/out/

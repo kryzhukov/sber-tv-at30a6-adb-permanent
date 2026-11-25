@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  «Сбер-Стоп NA» — сторож для SaluteTV AT30A6 (Android 13, StarOS) с лаунчером
+  NA Clean Toour TV (com.gathin.tvhome). Собран без Gradle: см. build-linux.sh.
+
+  Отличия от исходного io.sberstop 1.4 (Free My TV):
+  * главный экран возвращается на com.gathin.tvhome/.MainActivity;
+  * список пакетов — проверенный список владельца AT30A6 (20 пакетов, sberstop 1.4);
+  * заставка переключается на com.gathin.tvhome/.ClockDream, пока в ней сидит Сбер;
+  * добавлена QUERY_ALL_PACKAGES (список пакетов и вторая половина проверки);
+  * на экране показывается ADB-ключ приложения (отпечаток) для авторизации на ТВ.
+
+  Пакет и подпись намеренно оставлены от исходного сторожа (io.sberstop,
+  sberstop.keystore): так APK ставится обновлением поверх старой версии, если она
+  ещё есть на телевизоре. Если на ТВ стоит io.sberstop с другой подписью —
+  сначала `adb uninstall io.sberstop`, см. README-NA.md.
+
+  2.1-NA: добавлена служба доступности io.sberstop.CtvCloseWatcher — после ухода
+  приложения «Цифровое ТВ» (limehd.ru.ctv) с переднего плана (или при выключении
+  экрана) она очищает его кеш и данные через ADB (`pm clear limehd.ru.ctv`).
+  Служба доступности НЕ требует доступа к содержимому окон и не получает новых
+  разрешений; включается владельцем ТВ вручную, см. README-NA.md.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.sberstop"
+    android:versionCode="7"
+    android:versionName="2.1-NA">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Android 11+. Список пакетов сторож берёт через ADB-shell (`pm list packages`), но
+         разрешение объявляем, чтобы приложение видело установленные пакеты и без shell. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <application
+        android:label="Сбер-Стоп NA"
+        android:icon="@drawable/icon"
+        android:banner="@drawable/banner"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Сбер-Стоп NA"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode|density|fontScale|locale">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Загрузка, обновление сторожа и сообщения об установке/включении приложений. -->
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.PACKAGE_CHANGED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Фоновые проходы: JobScheduler, чтобы Android не блокировал запуск из фона. -->
+        <service
+            android:name=".KeeperJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Немедленный проход по кнопке «Проверить сейчас» (приложение на экране). -->
+        <service
+            android:name=".KeeperService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- 2.1-NA: служба доступности «очистка ЦТВ после закрытия». Новых разрешений не
+             добавляет: событий смены активного окна хватает, содержимое окон не читается
+             (canRetrieveWindowContent=false в res/xml/accessibility_service_config.xml).
+             Включается владельцем ТВ вручную — Настройки → Специальные возможности, либо
+             командами из README-NA.md. -->
+        <service
+            android:name=".CtvCloseWatcher"
+            android:exported="true"
+            android:label="Сбер-Стоп NA: очистка ЦТВ"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+    </application>
+</manifest>

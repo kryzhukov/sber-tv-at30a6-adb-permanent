@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # install-watchdog.sh — установить «Сбер-Стоп NA» (io.sberstop) и заранее авторизовать его ADB-ключ.
 #
+# Версия 2.1-NA умеет ещё и чистить кеш+данные «Цифрового ТВ» (limehd.ru.ctv) после каждого
+# закрытия: для этого скрипт включает службу доступности io.sberstop/io.sberstop.CtvCloseWatcher.
+# ВНИМАНИЕ: pm clear сбрасывает вход и настройки ЦТВ; отключается флажком в самом приложении.
+#
 # Сторож ходит по ADB на 127.0.0.1:5555, чтобы удалять вернувшиеся приложения Сбера и возвращать
 # главный экран на NA. Чтобы он работал БЕЗ запроса «Разрешить отладку» (в т.ч. после каждой
 # перезагрузки), ключ генерируется этим скриптом заранее:
@@ -12,7 +16,7 @@
 set -euo pipefail
 : "${TV_SERIAL:?Задайте TV_SERIAL, например 192.168.1.50:5555}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-APK="${1:-$HERE/../apk/SberStop-NA-2.0.apk}"
+APK="${1:-$HERE/../apk/SberStop-NA-2.1.apk}"
 PKG=io.sberstop
 KEYDIR="$HERE/wd-key"
 
@@ -28,6 +32,11 @@ adb -s "$TV_SERIAL" install -r "$APK"
 # проверки, когда телевизор «спит», и вернувшиеся приложения Сбера живут дольше.
 adb -s "$TV_SERIAL" shell 'cmd deviceidle whitelist +io.sberstop' >/dev/null
 echo "[*] сторож добавлен в whitelist Doze"
+
+# Служба доступности нужна для очистки ЦТВ после закрытия (2.1-NA). Включаем её через settings:
+# тот же путь, что и ручное включение в Настройках → Специальные возможности.
+echo "[*] включаю службу доступности (очистка ЦТВ после закрытия)"
+adb -s "$TV_SERIAL" shell 's=$(settings get secure enabled_accessibility_services); case "$s" in *io.sberstop/io.sberstop.CtvCloseWatcher*) ;; ""|null) settings put secure enabled_accessibility_services io.sberstop/io.sberstop.CtvCloseWatcher ;; *) settings put secure enabled_accessibility_services "$s:io.sberstop/io.sberstop.CtvCloseWatcher" ;; esac; settings put secure accessibility_enabled 1; echo "    accessibility_enabled=$(settings get secure accessibility_enabled)"; echo "    services=$(settings get secure enabled_accessibility_services)"' 
 
 APP_UID="$(adb -s "$TV_SERIAL" shell "dumpsys package $PKG | grep -m1 userId=" | tr -dc '0-9')"
 [ -n "$APP_UID" ] || { echo "не смог определить uid пакета $PKG" >&2; exit 1; }

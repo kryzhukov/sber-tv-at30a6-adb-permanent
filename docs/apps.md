@@ -116,8 +116,9 @@ scripts/debloat.sh             # удалить (pm uninstall --user 0)
 ## Сторож «Сбер-Стоп NA»
 
 Прошивка Сбера при каждой загрузке возвращает свой лаунчер и часть приложений. Сторож
-(`io.sberstop`, 2.0-NA, [`apk/SberStop-NA-2.0.apk`](../apk/SberStop-NA-2.0.apk), sha256
-`a670dd1eb7cbdf9c4db4896cf3126b23a79ae02c59c15ab38c4f578fc161a11d`) собран из проекта
+(`io.sberstop`, 2.1-NA, [`apk/SberStop-NA-2.1.apk`](../apk/SberStop-NA-2.1.apk), sha256
+`1868b18139a92cf026dc46d5f4af7a0ccbeebe6e3a1364fc1dd08c6aafcda435`; исходники —
+[`watchdog/`](../watchdog)) собран из проекта
 [sber-tv-at30a6-free-my-tv](https://github.com/kryzhukov/sber-tv-at30a6-free-my-tv) и переделан
 под лаунчер NA:
 
@@ -137,6 +138,38 @@ scripts/debloat.sh             # удалить (pm uninstall --user 0)
 перезагрузка, затем один запуск приложения и кнопка «Проверить сейчас».
 
 Проверено: после перезагрузки сторож поднялся сам и отработал — «удалено: 1 прил., главный экран → NA».
+
+### Очистка кеша и данных «Цифрового ТВ» после закрытия
+
+В версии **2.1-NA** добавлена служба доступности `io.sberstop/io.sberstop.CtvCloseWatcher`:
+после того как «Цифровое ТВ» (`limehd.ru.ctv`) уходит с переднего плана, сторож выполняет
+`pm clear limehd.ru.ctv` — это очищает **и кеш, и данные** приложения.
+
+* Детект: event от `limehd.ru.ctv` → «курок»; уход на другой экран → через 1.5 с проверка
+  `mResumedActivity` через ADB (оверлеи/диалоги/шторка закрытием не считаются) → очистка.
+  Отдельно — `ACTION_SCREEN_OFF`: выключение экрана при открытом ЦТВ тоже очищает.
+* Антидребезг 3 с; если dumpsys не ответил — не чистит (безопаснее).
+* Переключатель в приложении: «Чистить «Цифровое ТВ» после закрытия» (по умолчанию **включён**),
+  строка статуса «Очистка ЦТВ: включена, последняя: чч:мм».
+
+> ⚠️ `pm clear` сбрасывает **вход и настройки** приложения: после каждого закрытия ЦТВ придётся
+> заново авторизоваться. Если это не нужно — снимите галочку в «Сбер-Стоп NA»; остальной сторож
+> продолжит работать.
+
+Скрипт [`scripts/install-watchdog.sh`](../scripts/install-watchdog.sh) при установке сам включает
+службу доступности:
+
+```bash
+settings put secure enabled_accessibility_services io.sberstop/io.sberstop.CtvCloseWatcher
+settings put secure accessibility_enabled 1
+```
+
+Проверка (adb, root не нужен):
+
+```bash
+adb logcat -d | grep CtvCloseWatcher        # "уход с экрана — pm clear limehd.ru.ctv: Success"
+adb shell dumpsys accessibility | grep CtvCloseWatcher
+```
 
 ### Он не будет висеть на экране
 
@@ -159,4 +192,5 @@ scripts/debloat.sh             # удалить (pm uninstall --user 0)
 | Лаунчер Сбера и 19 приложений | отсутствуют |
 | «Цифровое ТВ» 5.1.1 | установлен, запускается |
 | Сторож после перезагрузки | поднялся сам, вернул Home, удалил вернувшееся |
+| Очистка ЦТВ после закрытия | Home/другое приложение и выключение экрана → `pm clear`, данные 8,7 МБ/102 файла → 4 КБ/0 |
 | Свободно на /data | ~0,6–0,9 ГБ |
