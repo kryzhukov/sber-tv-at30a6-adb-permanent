@@ -12,6 +12,11 @@ import android.content.Intent;
  * после обновления «Сбер-Стоп NA» и при установке/включении приложения (когда система доставляет
  * такое сообщение) — один проход в ближайшие секунды, дальше задания идут цепочкой каждые 2 минуты.
  * Плюс страховочное периодическое задание раз в 15 минут.
+ *
+ * <p>2.3-NA: после загрузки и после обновления сторожа дополнительно запускается
+ * {@link CleanerService} — фоновый сторож ЦТВ, который не зависит от службы доступности (на
+ * YAOS/Hartens её нельзя включить). Запуск — {@code startForegroundService}, при исключении
+ * (ограничение Android 12+ на старт foreground-службы из фона) — {@code startService}.
  */
 public class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context c, Intent intent) {
@@ -22,6 +27,9 @@ public class BootReceiver extends BroadcastReceiver {
             // ещё недолго видит чужой экран. Главный экран при этом остаётся за NA-лаунчером.
             KeeperJob.scheduleOnce(c, 45_000L);
             KeeperJob.schedulePeriodic(c);
+            // 2.3-NA: фоновый сторож ЦТВ (без службы доступности) — сам себя перезапускает по
+            // START_STICKY, но после перезагрузки ТВ его нужно поднять заново.
+            CleanerService.start(c);
             return;
         }
         if (Intent.ACTION_PACKAGE_ADDED.equals(action) || Intent.ACTION_PACKAGE_REPLACED.equals(action)

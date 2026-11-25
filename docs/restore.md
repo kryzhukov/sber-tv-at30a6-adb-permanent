@@ -65,6 +65,17 @@ $A 'settings put secure accessibility_enabled 0'
 `com.gathin.tvhome/.HomeKeyService`): взять текущую строку из `settings get`, удалить из неё
 `io.sberstop/io.sberstop.CtvCloseWatcher` и записать обратно через `settings put` с разделителем `:`.
 
+## Остановить фоновую очистку ЦТВ (2.3-NA)
+
+```bash
+A="adb -s 192.168.3.110:5555 shell"
+$A 'am stopservice -n io.sberstop/.CleanerService'   # остановить сервис до перезагрузки
+$A 'cmd deviceidle whitelist -io.sberstop'           # убрать из белого списка энергосбережения
+```
+
+Полностью — снять галочку «Чистить «Цифровое ТВ» после закрытия» в приложении (или выключить/
+удалить сторожа). Служба доступности, если включали: `settings put secure enabled_accessibility_services ""`.
+
 ## Включить автообновления обратно
 
 ```bash

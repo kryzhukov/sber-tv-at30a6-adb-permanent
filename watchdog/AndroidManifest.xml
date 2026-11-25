@@ -20,11 +20,29 @@
   экрана) она очищает его кеш и данные через ADB (`pm clear limehd.ru.ctv`).
   Служба доступности НЕ требует доступа к содержимому окон и не получает новых
   разрешений; включается владельцем ТВ вручную, см. README-NA.md.
+
+  2.2-NA: сторож универсальный. Blacklist.apply() перед любыми изменениями
+  проверяет, что ТВ — Сбер-ТВ: установлены и сервисы Сбера (ru.sberdevices.services
+  или ru.sberdevices.starlauncher), и лаунчер NA (com.gathin.tvhome). Иначе проход
+  сразу возвращает «не Сбер-ТВ: Sber-очистка пропущена» и НИЧЕГО не меняет (Home,
+  заставка, настройки, пакеты не трогаются). На не-Sber ТВ работает только служба
+  доступности с очисткой ЦТВ. Дополнительно (2.2-NA) Adb.java может брать ключ из
+  внешнего каталога приложения — adbkey/adbkey.pub, подложенные `adb push`.
+
+  2.3-NA: добавлен фоновый сервис io.sberstop.CleanerService — очистка ЦТВ БЕЗ службы
+  доступности, для ТВ, где прошивка (YAOS/Hartens) не даёт включить сторонний
+  AccessibilityService. Сервис объявлен exported=true, поэтому запускается с ПК по
+  adb без UI: `am start-foreground-service -n io.sberstop/.CleanerService`. Раз в ~2 с
+  в фоновом потоке спрашивает активную активити через ADB и, если ЦТВ ушло с экрана,
+  делает `pm clear limehd.ru.ctv` (антидребезг 3 с); при ACTION_SCREEN_OFF чистит,
+  если ЦТВ было на экране. Low-importance уведомление, канал "cleaner". Автозапуск из
+  BootReceiver (startForegroundService, при исключении — startService). Новых
+  разрешений нет (FOREGROUND_SERVICE объявлен ещё в 2.1-NA).
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.sberstop"
-    android:versionCode="7"
-    android:versionName="2.1-NA">
+    android:versionCode="9"
+    android:versionName="2.3-NA">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -80,6 +98,19 @@
         <service
             android:name=".KeeperService"
             android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- 2.3-NA: фоновая очистка ЦТВ БЕЗ службы доступности (для ТВ, где сторонний
+             AccessibilityService включить нельзя). exported=true — сервис запускается с ПК по adb
+             без UI: `am start-foreground-service -n io.sberstop/.CleanerService`. Работает как
+             foreground service с low-importance уведомлением (канал "cleaner"), опрашивает активную
+             активити через ADB раз в ~2 с и чистит ЦТВ после ухода с экрана / выключения экрана.
+             Новых разрешений не требует: FOREGROUND_SERVICE объявлен выше. Кнопка «Проверить
+             сейчас» этот сервис НЕ запускает. -->
+        <service
+            android:name=".CleanerService"
+            android:exported="true"
+            android:label="Сбер-Стоп NA: фоновая очистка ЦТВ"
             android:foregroundServiceType="dataSync" />
 
         <!-- 2.1-NA: служба доступности «очистка ЦТВ после закрытия». Новых разрешений не

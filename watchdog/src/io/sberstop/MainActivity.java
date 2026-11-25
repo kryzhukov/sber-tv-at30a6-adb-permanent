@@ -30,13 +30,24 @@ import java.util.Locale;
  *
  * <p>2.1-NA: здесь же переключатель «Чистить «Цифровое ТВ» после закрытия»
  * ({@link CtvCloseWatcher#PREF_CLEAR_ON_CLOSE}, по умолчанию включён) и строка статуса очистки ЦТВ.
+ *
+ * <p>2.2-NA: сторож универсальный. Строка «Режим: …» показывает, определён ли ТВ как Сбер-ТВ
+ * ({@link Blacklist#isSberTv}); на не-Sber ТВ в статусе появляется «не Сбер-ТВ: Sber-очистка
+ * пропущена», а работают только очистка ЦТВ и служебные задания.
+ *
+ * <p>2.3-NA: очистка ЦТВ теперь может работать и <b>без службы доступности</b> — фоновым
+ * {@link CleanerService}, который запускается с ПК по adb без UI. Здесь добавлена строка его статуса
+ * и подсказка с командой запуска. Кнопка «Проверить сейчас» по-прежнему запускает только
+ * {@link KeeperService} (проход по списку), а не CleanerService.
  */
 public class MainActivity extends Activity {
     private static final String TAG = "SberStop";
 
+    private TextView mode;
     private TextView status;
     private TextView hint;
     private TextView ctvStatus;
+    private TextView cleanerStatus;
     private TextView keySummary;
     private TextView keyFull;
     private long pressedAt;
@@ -67,16 +78,24 @@ public class MainActivity extends Activity {
         root.addView(title);
 
         TextView what = new TextView(this);
-        what.setText("Сторож мусора Сбера для SaluteTV AT30A6 (Android 13) с лаунчером NA Clean Toour TV. "
-                + "Проверяет после каждой загрузки и примерно каждые две минуты: удаляет вернувшееся "
-                + "приложение Сбера (если удалить нельзя — выключает), автообновления прошивки и "
-                + "приложений, рекламу поверх экрана. Главный экран — NA Clean Toour TV "
-                + "(com.gathin.tvhome), заставка — её часы: если Сбер вернул свой лаунчер или сбросил "
-                + "выбор, сторож снова ставит NA.");
+        what.setText("Сторож для Сбер-ТВ (SaluteTV AT30A6, Android 13) с лаунчером NA Clean Toour TV "
+                + "и для любых других ТВ (YAOS/Hartens и др.). На Сбер-ТВ удаляет вернувшиеся "
+                + "приложения Сбера (если удалить нельзя — выключает), отключает автообновления и "
+                + "рекламу поверх экрана, возвращает главный экран и заставку NA. На не-Sber ТВ "
+                + "Sber-очистка пропускается: работают только очистка «Цифрового ТВ» и служебные "
+                + "задания. Полная очистка — только если на ТВ есть сервисы Сбера и лаунчер "
+                + "com.gathin.tvhome.");
         what.setTextColor(0xFFB0B0B0);
         what.setTextSize(15);
         what.setPadding(0, gap, 0, pad);
         root.addView(what);
+
+        // 2.2-NA: строка режима — на не-Sber ТВ Sber-логика не выполняется вообще.
+        mode = new TextView(this);
+        mode.setTextSize(15);
+        mode.setPadding(0, 0, 0, gap);
+        root.addView(mode);
+        showMode();
 
         status = new TextView(this);
         status.setTextColor(0xFF80C080);
@@ -119,6 +138,14 @@ public class MainActivity extends Activity {
         ctvStatus.setTextSize(15);
         ctvStatus.setPadding(0, gap, 0, 0);
         root.addView(ctvStatus);
+
+        // 2.3-NA: очистка ЦТВ может работать и БЕЗ службы доступности — фоновым CleanerService,
+        // который запускается с ПК по adb (на YAOS/Hartens службу доступности включить нельзя).
+        cleanerStatus = new TextView(this);
+        cleanerStatus.setTextColor(0xFF90B0D0);
+        cleanerStatus.setTextSize(13);
+        cleanerStatus.setPadding(0, 2, 0, 0);
+        root.addView(cleanerStatus);
 
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -163,7 +190,9 @@ public class MainActivity extends Activity {
         root.addView(keyFull);
 
         TextView footer = new TextView(this);
-        footer.setText("Главный экран: com.gathin.tvhome/com.gathin.tvhome.MainActivity\n"
+        footer.setText("Сбер-ТВ: главный экран com.gathin.tvhome/com.gathin.tvhome.MainActivity, "
+                + "заставка com.gathin.tvhome/.ClockDream\n"
+                + "Не Сбер-ТВ: приложения, главный экран и настройки ТВ не меняются.\n"
                 + "Первый запуск: один раз разрешите отладку на ТВ («Всегда разрешать»).");
         footer.setTextColor(0xFF607080);
         footer.setTextSize(12);
@@ -211,7 +240,9 @@ public class MainActivity extends Activity {
 
     /** Показывает последний результат; «Проверяю…» держится, пока не запишется новый. */
     private void show() {
+        showMode();
         showCtvStatus();
+        showCleanerStatus();
         SharedPreferences p = getSharedPreferences("state", MODE_PRIVATE);
         String result = p.getString("result", null);
         long time = p.getLong("time", 0);
@@ -227,7 +258,8 @@ public class MainActivity extends Activity {
                     + "(галочка «Всегда разрешать»), если телевизор спросит один раз.");
         } else {
             boolean error = result.startsWith("Ошибка") || result.contains("НЕ УСТАНОВЛЕН");
-            status.setTextColor(error ? 0xFFFF8080 : 0xFF80C080);
+            boolean skipped = result.startsWith(Blacklist.NOT_SBER_STATUS);
+            status.setTextColor(skipped ? 0xFF90B0D0 : (error ? 0xFFFF8080 : 0xFF80C080));
             String when = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(time));
             status.setText("Последняя проверка: " + when + " — " + result);
         }
@@ -240,17 +272,38 @@ public class MainActivity extends Activity {
         }
     }
 
+    // MARK: - 2.2-NA: режим ТВ (Сбер-ТВ или любой другой)
+
+    /**
+     * Строка «Режим: …». На Сбер-ТВ (есть сервисы Сбера и лаунчер NA) выполняется полная очистка; на
+     * любом другом ТВ — только очистка ЦТВ, Сбер-логика пропускается и настройки ТВ не меняются.
+     */
+    private void showMode() {
+        if (mode == null) return;
+        if (Blacklist.isSberTv(this)) {
+            mode.setTextColor(0xFF80C080);
+            mode.setText("Режим: Сбер-ТВ — удаление приложений Сбера, главный экран и заставка NA, "
+                    + "очистка ЦТВ.");
+        } else {
+            mode.setTextColor(0xFF90B0D0);
+            mode.setText("Режим: не Сбер-ТВ — работает только очистка «Цифрового ТВ»; приложения, "
+                    + "главный экран и настройки ТВ не трогаются.");
+        }
+    }
+
     // MARK: - 2.1-NA: очистка «Цифрового ТВ»
 
     /**
      * Строка статуса очистки ЦТВ: «Очистка ЦТВ: включена, последняя: чч:мм». Если служба доступности
-     * не включена, это видно прямо здесь: без неё очистка не работает (переключатель сам её не включает).
+     * не включена и фоновый CleanerService тоже не запущен, это видно прямо здесь: очистка не работает
+     * (переключатель сам их не включает).
      */
     private void showCtvStatus() {
         if (ctvStatus == null) return;
         boolean enabled = getSharedPreferences(CtvCloseWatcher.PREFS, MODE_PRIVATE)
                 .getBoolean(CtvCloseWatcher.PREF_CLEAR_ON_CLOSE, true);
         boolean serviceOn = ctvServiceEnabled();
+        boolean cleanerOn = CleanerService.isRunning();
         SharedPreferences p = getSharedPreferences(CtvCloseWatcher.STATE_PREFS, MODE_PRIVATE);
         long time = p.getLong(CtvCloseWatcher.STATE_TIME, 0);
         boolean ok = p.getBoolean(CtvCloseWatcher.STATE_OK, true);
@@ -263,15 +316,29 @@ public class MainActivity extends Activity {
         } else {
             s.append("—");
         }
-        if (enabled && !serviceOn) s.append(" · служба доступности не включена");
+        if (enabled && !serviceOn && !cleanerOn) s.append(" · служба доступности не включена");
         ctvStatus.setText(s.toString());
         if (!enabled) {
             ctvStatus.setTextColor(0xFFB0B0B0);
-        } else if ((time > 0 && !ok) || !serviceOn) {
+        } else if ((time > 0 && !ok) || (!serviceOn && !cleanerOn)) {
             ctvStatus.setTextColor(0xFFFFB060);
         } else {
             ctvStatus.setTextColor(0xFF90B0D0);
         }
+    }
+
+    /**
+     * 2.3-NA: строка про фоновый {@link CleanerService}. Он не зависит от службы доступности и
+     * запускается с ПК по adb без UI — на не-Sber ТВ (YAOS/Hartens) это основной способ очистки ЦТВ.
+     */
+    private void showCleanerStatus() {
+        if (cleanerStatus == null) return;
+        boolean on = CleanerService.isRunning();
+        cleanerStatus.setTextColor(on ? 0xFF80C080 : 0xFF90B0D0);
+        cleanerStatus.setText((on
+                ? "Фоновая очистка ЦТВ: работает (сервис запущен, уведомление «Очистка ЦТВ»)"
+                : "Фоновая очистка ЦТВ: сервис не запущен")
+                + "\nЗапуск с ПК по adb: am start-foreground-service -n io.sberstop/.CleanerService");
     }
 
     /** Включена ли служба {@link CtvCloseWatcher} в системных настройках доступности (только чтение). */

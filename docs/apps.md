@@ -116,8 +116,8 @@ scripts/debloat.sh             # удалить (pm uninstall --user 0)
 ## Сторож «Сбер-Стоп NA»
 
 Прошивка Сбера при каждой загрузке возвращает свой лаунчер и часть приложений. Сторож
-(`io.sberstop`, 2.1-NA, [`apk/SberStop-NA-2.1.apk`](../apk/SberStop-NA-2.1.apk), sha256
-`1868b18139a92cf026dc46d5f4af7a0ccbeebe6e3a1364fc1dd08c6aafcda435`; исходники —
+(`io.sberstop`, 2.3-NA, [`apk/SberStop-NA-2.3.apk`](../apk/SberStop-NA-2.3.apk), sha256
+`b378b147207a85eba298d4ad966d3a3bf0c33c4c00649eaedee019d8bca5e751`; исходники —
 [`watchdog/`](../watchdog)) собран из проекта
 [sber-tv-at30a6-free-my-tv](https://github.com/kryzhukov/sber-tv-at30a6-free-my-tv) и переделан
 под лаунчер NA:
@@ -170,6 +170,27 @@ settings put secure accessibility_enabled 1
 adb logcat -d | grep CtvCloseWatcher        # "уход с экрана — pm clear limehd.ru.ctv: Success"
 adb shell dumpsys accessibility | grep CtvCloseWatcher
 ```
+
+### ТВ без Сбера / где служба доступности запрещена (2.3-NA, CleanerService)
+
+На YAOS/Hartens сторонние службы доступности прошивка не включает, а `BOOT_COMPLETED` приложению
+может не приходить, пока оно не в «белом списке» энергосбережения. Поэтому в 2.3-NA есть
+`CleanerService` — foreground-сервис без интерфейса: раз в 2 с через ADB (`mResumedActivity`)
+смотрит, не закрылось ли ЦТВ, и делает `pm clear limehd.ru.ctv` (антидребезг 3 с, `SCREEN_OFF` —
+очистка). Sber-логика на таком ТВ пропускается guard'ом («не Сбер-ТВ»). Запрос «Разрешить
+отладку» не появляется: сторож берёт **ADB-ключ этого ПК** из своего external-каталога
+(`/sdcard/Android/data/io.sberstop/files/adbkey` + `adbkey.pub` в DER), а этот ключ уже доверен.
+
+Установка одной командой (ставит ЦТВ + сторожа, подкладывает ключ, whitelist Doze, запускает сервис):
+
+```bash
+TV_SERIAL=192.168.1.113:5555 scripts/install-ctv-cleaner.sh /path/to/Цифровое-ТВ.apk
+```
+
+Проверено на Hartens HTY-50U11S-VD (Android 14/YAOS): открыл ЦТВ → Home → через ~3 с
+`CleanerService: ЦТВ ушло с экрана … pm clear limehd.ru.ctv: Success`; штатный Home Яндекса и
+заставка не тронуты; после перезагрузки сервис поднялся сам (BootReceiver + `deviceidle whitelist`).
+Остановить очистку: снять флажок в приложении или `am stopservice -n io.sberstop/.CleanerService`.
 
 ### Он не будет висеть на экране
 

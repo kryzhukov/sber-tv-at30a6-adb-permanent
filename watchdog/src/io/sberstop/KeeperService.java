@@ -22,9 +22,13 @@ public class KeeperService extends Service {
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         NotificationChannel ch = new NotificationChannel(CHANNEL, "Сбер-Стоп NA", NotificationManager.IMPORTANCE_LOW);
         createChannel(ch);
+        // 2.2-NA: на не-Sber ТВ проход сразу вернёт «Sber-очистка пропущена» — так и пишем в уведомлении.
+        String text = Blacklist.isSberTv(this)
+                ? "Проверяю приложения Сбера…"
+                : "Не Сбер-ТВ: Sber-очистка пропускается…";
         Notification n = new Notification.Builder(this, CHANNEL)
                 .setContentTitle("Сбер-Стоп NA")
-                .setContentText("Проверяю приложения Сбера…")
+                .setContentText(text)
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
                 .build();
         try {

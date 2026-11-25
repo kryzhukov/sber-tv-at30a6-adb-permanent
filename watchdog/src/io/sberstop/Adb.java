@@ -232,6 +232,27 @@ final class Adb implements Closeable {
         File privateFile = new File(dir, "adbkey"), publicFile = new File(dir, "adbkey.pub");
         try {
             KeyFactory factory = KeyFactory.getInstance("RSA");
+            // 2.2-NA: ключ можно «подложить» снаружи, без root и без запроса на ТВ:
+            // /sdcard/Android/data/io.sberstop/files/adbkey     — PKCS#8 DER (как внутренний);
+            // /sdcard/Android/data/io.sberstop/files/adbkey.pub — X.509 DER (SubjectPublicKeyInfo).
+            // Если это ключ уже авторизованного на ТВ ПК, сторож ходит по ADB молча. Внешний ключ
+            // имеет приоритет; если файлов нет или они битые — дальше как раньше (внутренний/новый).
+            File extDir = externalKeyDir(c);
+            if (extDir != null) {
+                File extPrivate = new File(extDir, "adbkey");
+                File extPublic = new File(extDir, "adbkey.pub");
+                if (extPrivate.isFile() && extPublic.isFile()) {
+                    try {
+                        KeyPair pair = new KeyPair(
+                                factory.generatePublic(new X509EncodedKeySpec(readFile(extPublic))),
+                                factory.generatePrivate(new PKCS8EncodedKeySpec(readFile(extPrivate))));
+                        Log.i(TAG, "ADB: использую ключ из внешнего каталога " + extDir);
+                        return pair;
+                    } catch (GeneralSecurityException | IOException e) {
+                        Log.w(TAG, "ADB: внешний ключ не прочитался (" + e + "), беру внутренний");
+                    }
+                }
+            }
             if (privateFile.exists() && publicFile.exists()) {
                 try {
                     return new KeyPair(factory.generatePublic(new X509EncodedKeySpec(readFile(publicFile))),
@@ -249,6 +270,20 @@ final class Adb implements Closeable {
             return pair;
         } catch (GeneralSecurityException e) {
             throw new IOException("ADB key: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 2.2-NA: внешний каталог приложения ({@code /sdcard/Android/data/io.sberstop/files} и аналоги на
+     * ТВ) — туда можно положить {@code adbkey}/{@code adbkey.pub} через {@code adb push} без root.
+     * Нужен, чтобы сторож мог ходить по ADB ключом уже авторизованного ПК. null — недоступен.
+     */
+    private static File externalKeyDir(Context c) {
+        try {
+            return c.getExternalFilesDir(null);
+        } catch (Exception e) {
+            Log.w(TAG, "ADB: внешний каталог недоступен: " + e);
+            return null;
         }
     }
 

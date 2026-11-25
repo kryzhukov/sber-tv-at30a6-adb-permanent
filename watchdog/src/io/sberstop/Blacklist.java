@@ -1,6 +1,7 @@
 package io.sberstop;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.util.Log;
 
 import java.io.IOException;
@@ -35,6 +36,14 @@ import java.util.Set;
  *       иначе StarOS при загрузке снова включает заставку Сбера;</li>
  *   <li>ожидание разрешения отладки увеличено: на ТВ нужно успеть взять пульт.</li>
  * </ul>
+ *
+ * <p>2.2-NA: сторож стал универсальным. Вся Сбер-логика (список {@link #PACKAGES}, назначение
+ * главного экрана, заставка ClockDream, отключение автообновлений, {@code appops} на
+ * {@code ru.sberdevices.services}) выполняется только на Сбер-ТВ: если на телевизоре нет <b>и</b>
+ * сервисов Сбера ({@link #SBER_SERVICES} или {@link #SBER_LAUNCHER}), <b>и</b> лаунчера NA
+ * ({@link #HOME_PKG}), проход сразу возвращает «не Сбер-ТВ: Sber-очистка пропущена» и <b>ничего не
+ * меняет</b> — даже не открывает ADB (см. {@link #isSberTv}). На не-Sber ТВ (YAOS/Hartens и др.)
+ * работает только очистка ЦТВ службой {@code CtvCloseWatcher}.
  */
 final class Blacklist {
     private Blacklist() {}
@@ -49,6 +58,12 @@ final class Blacklist {
     static final String SCREENSAVER = HOME_PKG + "/.ClockDream";
     /** Лаунчер Сбера удаляется последним и только если главный экран уже переключился на NA. */
     static final String SBER_LAUNCHER = "ru.sberdevices.starlauncher";
+
+    /** «Сервисы Сбера» — главный признак Сбер-ТВ (вместе с лаунчером NA). */
+    static final String SBER_SERVICES = "ru.sberdevices.services";
+
+    /** 2.2-NA: статус на не-Sber ТВ — Sber-логика пропущена, на телевизоре ничего не менялось. */
+    static final String NOT_SBER_STATUS = "не Сбер-ТВ: Sber-очистка пропущена";
 
     /**
      * 20 пакетов — проверенный список владельца ТВ (автор kryzhukov/sber-tv-at30a6-free-my-tv):
@@ -96,6 +111,14 @@ final class Blacklist {
      *                 «Разрешить отладку?» (экран приложения может об этом написать).
      */
     static String apply(Context c, Adb.Approval approval) {
+        // 2.2-NA guard: на не-Sber ТВ не трогаем НИЧЕГО (пакеты, Home, заставку, настройки) и даже
+        // не открываем ADB — иначе телевизор показал бы запрос «Разрешить отладку?». Проверка идёт
+        // через PackageManager (в манифесте объявлен QUERY_ALL_PACKAGES), без shell.
+        if (!isSberTv(c)) {
+            String status = NOT_SBER_STATUS + " (" + notSberReason(c) + ")";
+            Log.i(TAG, status);
+            return status;
+        }
         try (Adb adb = Adb.connect(c, approval == null ? 30_000 : 120_000, approval)) {
             Set<String> present = packages(adb, "");
 
@@ -163,6 +186,53 @@ final class Blacklist {
             String message = e.getMessage();
             if (message == null || message.isEmpty()) message = e.toString();
             return "Ошибка: " + message;
+        }
+    }
+
+    // MARK: - 2.2-NA: определение «это Сбер-ТВ?»
+
+    /**
+     * 2.2-NA: выполнять ли Сбер-логику. Условие — на ТВ есть <b>и</b> сервисы Сбера
+     * ({@link #SBER_SERVICES} или {@link #SBER_LAUNCHER}), <b>и</b> лаунчер NA ({@link #HOME_PKG}).
+     * Только тогда имеет смысл удалять пакеты Сбера, назначать Home/заставку NA, выключать
+     * автообновления и запрещать рекламный {@code appops}: на чужом ТВ (YAOS/Hartens) этого делать
+     * нельзя — там нет ни пакетов Сбера, ни его заставки, и трогать Home/настройки недопустимо.
+     *
+     * <p>Проверка через {@link PackageManager}, а не через ADB: не требует авторизации отладки и не
+     * показывает на телевизоре запрос «Разрешить отладку?». Пакет, не видимый менеджеру пакетов
+     * (не установлен для текущего пользователя), считается отсутствующим.
+     */
+    static boolean isSberTv(Context c) {
+        boolean sber = isInstalled(c, SBER_SERVICES) || isInstalled(c, SBER_LAUNCHER);
+        boolean na = isInstalled(c, HOME_PKG);
+        return sber && na;
+    }
+
+    /** Чего не хватило для Сбер-логики — для строки статуса «не Сбер-ТВ: … (…)». */
+    static String notSberReason(Context c) {
+        boolean sber = isInstalled(c, SBER_SERVICES) || isInstalled(c, SBER_LAUNCHER);
+        boolean na = isInstalled(c, HOME_PKG);
+        StringBuilder why = new StringBuilder();
+        if (!sber) {
+            why.append("нет сервисов Сбера: ").append(SBER_SERVICES).append(" или ").append(SBER_LAUNCHER);
+        }
+        if (!na) {
+            if (why.length() > 0) why.append(", ");
+            why.append("нет лаунчера NA: ").append(HOME_PKG);
+        }
+        return why.length() == 0 ? "условия не выполнены" : why.toString();
+    }
+
+    /** Установлен ли пакет (без ADB; манифест объявляет QUERY_ALL_PACKAGES). */
+    private static boolean isInstalled(Context c, String pkg) {
+        try {
+            c.getPackageManager().getPackageInfo(pkg, 0);
+            return true;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "не удалось проверить пакет " + pkg + ": " + e);
+            return false;
         }
     }
 
